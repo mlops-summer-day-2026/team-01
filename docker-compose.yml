@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: standbot
+      POSTGRES_USER: standbot
+      POSTGRES_PASSWORD: standbot
+    ports:
+      - "5432:5432"
+    volumes:
+      - standbot_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U standbot -d standbot"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  standbot_postgres_data:

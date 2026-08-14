@@ -1,0 +1,1 @@
+"""Telegram stand manager bot."""
