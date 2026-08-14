@@ -197,6 +197,20 @@ async def _is_team_member(session: AsyncSession, team_id: int, user_id: int) -> 
     )
 
 
+def _atomic_take_statement(stand_id: int, user_id: int):
+    """Build the one-statement compare-and-set used by concurrent callers."""
+    return (
+        update(Stand)
+        .where(Stand.id == stand_id, Stand.occupied_by_user_id.is_(None))
+        .values(
+            occupied_by_user_id=user_id,
+            occupied_at=func.now(),
+            updated_at=func.now(),
+        )
+        .returning(Stand.id)
+    )
+
+
 async def list_teams(session: AsyncSession, context: CommandContext) -> str:
     teams = (
         await session.execute(
@@ -450,14 +464,7 @@ async def take_stand(
     stand = await _stand(session, team.id, stand_name)
     for _ in range(2):
         acquired = await session.scalar(
-            update(Stand)
-            .where(Stand.id == stand.id, Stand.occupied_by_user_id.is_(None))
-            .values(
-                occupied_by_user_id=target_user_id,
-                occupied_at=func.now(),
-                updated_at=func.now(),
-            )
-            .returning(Stand.id)
+            _atomic_take_statement(stand.id, target_user_id)
         )
         if acquired is not None:
             target_user = await session.get(User, target_user_id)
@@ -481,6 +488,7 @@ async def release_stand(
     context: CommandContext,
     slug: str,
     stand_name: str,
+    target: TelegramIdentity | None = None,
 ) -> str:
     team = await _team(session, context.workspace_id, slug)
     stand = await _stand(session, team.id, stand_name)
@@ -489,6 +497,15 @@ async def release_stand(
     )
     if owner_id is None:
         return f"ℹ️ Стенд «{stand.name}» уже свободен."
+    if target is not None:
+        _require_role(context, WorkspaceRole.MODERATOR)
+        target_user_id = await upsert_user(session, target)
+        await ensure_workspace_member(session, context.workspace_id, target_user_id)
+        if owner_id != target_user_id:
+            owner = await session.get(User, owner_id)
+            raise DomainError(
+                f"Стенд занят другим пользователем: {_person(owner.display_name, owner.username)}."
+            )
     if context.role == WorkspaceRole.USER and owner_id != context.user_id:
         owner = await session.get(User, owner_id)
         raise DomainError(
