@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#090817">
+    <title>Босс-мод · секретный план</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="locked">
+    <div class="noise" aria-hidden="true"></div>
+    <div class="orb orb-one" aria-hidden="true"></div>
+    <div class="orb orb-two" aria-hidden="true"></div>
+
+    <section class="gate" aria-label="Секретный экран">
+      <div class="gate-card">
+        <span class="eyebrow">STAND MANAGER · SECRET LAYER</span>
+        <div class="palm" aria-hidden="true">🌴</div>
+        <h1>Босс-мод</h1>
+        <p>Скрытая страница со списком дел.<br>Раскрытие — на ваш страх и риск.</p>
+        <button id="unlock" class="primary">Активировать режим <span>→</span></button>
+        <small>Совет: включите звук</small>
+      </div>
+    </section>
+
+    <main class="app-shell" aria-hidden="true">
+      <header>
+        <div>
+          <span class="eyebrow">КОМАНДА 1 · ПЛАН ПОБЕГА</span>
+          <h2>Секретный спринт</h2>
+        </div>
+        <div class="header-actions">
+          <button id="speak" class="icon-button" aria-label="Озвучить план">🔊 <span>Озвучить</span></button>
+          <button id="reset" class="icon-button" aria-label="Сбросить список">↺ <span>Сбросить</span></button>
+        </div>
+      </header>
+
+      <section class="hero-grid">
+        <article class="visual-card">
+          <video id="escape-video" muted loop playsinline preload="metadata" poster="assets/bali-escape.png">
+            <source src="assets/bali-loop.mp4" type="video/mp4">
+          </video>
+          <div class="video-shade"></div>
+          <div class="visual-copy">
+            <span class="live"><i></i> ESCAPE PROTOCOL</span>
+            <h3>До Бали —<br>четыре шага</h3>
+            <p>Сначала закрываем спринт. Потом — гештальт.</p>
+          </div>
+        </article>
+
+        <article class="mission-card">
+          <div class="mission-head">
+            <div>
+              <span class="eyebrow">MISSION CONTROL</span>
+              <h3>Что делаем?</h3>
+            </div>
+            <strong id="progress-label">0 / 4</strong>
+          </div>
+          <div class="progress"><span id="progress-bar"></span></div>
+
+          <div class="tasks" id="tasks">
+            <button class="task" data-id="bali" aria-pressed="false">
+              <span class="task-icon">✈️</span><span><b>Уехать на Бали</b><small>Найти билет в один конец</small></span><i></i>
+            </button>
+            <button class="task" data-id="quit" aria-pressed="false">
+              <span class="task-icon">🧳</span><span><b>Уволиться</b><small>Красиво, но без force push</small></span><i></i>
+            </button>
+            <button class="task" data-id="return" aria-pressed="false">
+              <span class="task-icon">🌀</span><span><b>Вернуться</b><small>Потому что стенд снова занят</small></span><i></i>
+            </button>
+            <button class="task" data-id="sprint" aria-pressed="false">
+              <span class="task-icon">🚀</span><span><b>Доделать спринт</b><small>Вот теперь действительно срочно</small></span><i></i>
+            </button>
+          </div>
+
+          <p class="hint">Нажимайте на задачи. Прогресс сохраняется в браузере.</p>
+        </article>
+      </section>
+
+      <footer><span>ESC — скрыть экран</span><span>Данные никуда не отправляются</span></footer>
+    </main>
+
+    <div id="confetti" aria-hidden="true"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
