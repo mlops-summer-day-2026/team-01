@@ -3,3 +3,8 @@
 !requirements.txt
 !app/
 !app/**
+!web/
+!web/Dockerfile
+!web/index.html
+!boss-mode/
+!boss-mode/**

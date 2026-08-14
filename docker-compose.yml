@@ -28,6 +28,7 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
       DATABASE_URL: postgresql+asyncpg://standbot:standbot@postgres:5432/standbot
+      WOW_PUBLIC_URL: ${WOW_PUBLIC_URL:-https://mlops-summer-day-2026.github.io/team-01/boss-mode/}
       PYTHONUNBUFFERED: "1"
     depends_on:
       postgres:
@@ -35,8 +36,8 @@ services:
 
   wow:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
     restart: unless-stopped
     ports:
       - "127.0.0.1:${WOW_HOST_PORT:-8088}:80"

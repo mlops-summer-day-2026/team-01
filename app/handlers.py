@@ -4,11 +4,19 @@ from collections.abc import Awaitable, Callable
 
 from aiogram import BaseMiddleware, Bot, Router
 from aiogram.filters import Command, CommandObject, CommandStart
-from aiogram.types import Chat, ChatMemberUpdated, Message, User as TelegramUser
+from aiogram.types import (
+    Chat,
+    ChatMemberUpdated,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    User as TelegramUser,
+)
 from aiogram.enums import ChatMemberStatus, ChatType
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import services
+from app.config import DEFAULT_WOW_PUBLIC_URL
 from app.models import WorkspaceRole
 
 
@@ -136,11 +144,32 @@ async def _bootstrap_administrators(
     )
 
 
-def create_router(sessions: async_sessionmaker[AsyncSession]) -> Router:
+def create_router(
+    sessions: async_sessionmaker[AsyncSession],
+    wow_public_url: str = DEFAULT_WOW_PUBLIC_URL,
+) -> Router:
     router = Router(name="stand-manager")
     middleware = DatabaseSessionMiddleware(sessions)
     router.message.outer_middleware(middleware)
     router.my_chat_member.outer_middleware(middleware)
+
+    @router.message(Command("bali"))
+    async def bali(message: Message) -> None:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🌴 Активировать Босс-мод",
+                        url=wow_public_url,
+                    )
+                ]
+            ]
+        )
+        await message.answer(
+            "🛰 Обнаружен секретный протокол команды 1.\n"
+            "Открывать только после завершения спринта.",
+            reply_markup=keyboard,
+        )
 
     @router.my_chat_member()
     async def bot_membership_changed(

@@ -39,7 +39,9 @@ async def run() -> None:
     database = Database(settings.database_url)
     bot = Bot(settings.telegram_bot_token)
     dispatcher = Dispatcher()
-    dispatcher.include_router(create_router(database.sessions))
+    dispatcher.include_router(
+        create_router(database.sessions, settings.wow_public_url)
+    )
 
     try:
         await database.create_schema()
