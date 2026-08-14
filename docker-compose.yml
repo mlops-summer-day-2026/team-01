@@ -1,49 +1,37 @@
+name: stand-manager
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-stand_manager}
-      POSTGRES_USER: ${POSTGRES_USER:-stand_manager}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stand_manager_local}
-
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
-
+      POSTGRES_DB: standbot
+      POSTGRES_USER: standbot
+      POSTGRES_PASSWORD: standbot
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
+      - standbot_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-stand_manager} -d ${POSTGRES_DB:-stand_manager}"
-        ]
-      interval: 3s
+      test: ["CMD-SHELL", "pg_isready -U standbot -d standbot"]
+      interval: 2s
       timeout: 3s
-      retries: 20
+      retries: 30
       start_period: 3s
 
   bot:
     build:
       context: .
       dockerfile: Dockerfile
-
     restart: unless-stopped
     init: true
-
-    env_file:
-      - .env
-
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stand_manager}:${POSTGRES_PASSWORD:-stand_manager_local}@postgres:5432/${POSTGRES_DB:-stand_manager}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
+      DATABASE_URL: postgresql+asyncpg://standbot:standbot@postgres:5432/standbot
       PYTHONUNBUFFERED: "1"
-
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
-  postgres_data:
-  
+  standbot_postgres_data:
