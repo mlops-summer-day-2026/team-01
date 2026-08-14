@@ -11,6 +11,9 @@ from app.db import Database
 from app.handlers import create_router
 
 
+logger = logging.getLogger(__name__)
+
+
 COMMANDS = [
     BotCommand(command="help", description="справка"),
     BotCommand(command="teams", description="список Team"),
@@ -40,8 +43,10 @@ async def run() -> None:
 
     try:
         await database.create_schema()
+        logger.info("Схема PostgreSQL готова")
         await bot.delete_webhook(drop_pending_updates=False)
         await bot.set_my_commands(COMMANDS)
+        logger.info("Запускается Telegram long polling")
         await dispatcher.start_polling(bot)
     finally:
         await bot.session.close()
