@@ -11,7 +11,13 @@ from app.handlers import create_router
 from app.models import Base
 from app.main import COMMANDS
 from app.models import WorkspaceRole
-from app.services import DomainError, _atomic_take_statement, parse_workspace_role
+from app.services import (
+    DomainError,
+    TelegramIdentity,
+    _atomic_take_statement,
+    default_workspace_role,
+    parse_workspace_role,
+)
 
 
 def test_settings_and_router_construct_without_external_connections(monkeypatch) -> None:
@@ -53,6 +59,22 @@ def test_workspace_role_parser(value: str, expected: WorkspaceRole) -> None:
 def test_workspace_role_parser_rejects_unknown_role() -> None:
     with pytest.raises(DomainError, match="USER, MODERATOR или ADMIN"):
         parse_workspace_role("superadmin")
+
+
+@pytest.mark.parametrize(
+    "username", ["echoretik", "@BERRIM0R", "bowsunowski", "OGALAY16"]
+)
+def test_default_admin_usernames_are_case_insensitive(username: str) -> None:
+    identity = TelegramIdentity(1, username, "Demo user")
+    assert default_workspace_role(identity) is WorkspaceRole.ADMIN
+
+
+def test_regular_user_keeps_fallback_role() -> None:
+    identity = TelegramIdentity(1, "regular_user", "Demo user")
+    assert (
+        default_workspace_role(identity, WorkspaceRole.MODERATOR)
+        is WorkspaceRole.MODERATOR
+    )
 
 
 def test_schema_contains_only_the_six_p0_tables() -> None:

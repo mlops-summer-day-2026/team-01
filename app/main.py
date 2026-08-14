@@ -9,6 +9,7 @@ from aiogram.types import BotCommand
 from app.config import Settings
 from app.db import Database
 from app.handlers import create_router
+from app.services import promote_default_admins
 
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,10 @@ async def run() -> None:
     try:
         await database.create_schema()
         logger.info("Схема PostgreSQL готова")
+        async with database.sessions() as session:
+            promoted = await promote_default_admins(session)
+            await session.commit()
+        logger.info("Назначены ADMIN по умолчанию: обновлено записей %s", promoted)
         await bot.delete_webhook(drop_pending_updates=False)
         await bot.set_my_commands(COMMANDS)
         logger.info("Запускается Telegram long polling")

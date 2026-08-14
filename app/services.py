@@ -53,6 +53,22 @@ ROLE_ALIASES = {
     "администратор": WorkspaceRole.ADMIN,
 }
 
+# Hackathon demo owners. Telegram identity is still stored by immutable user_id;
+# this allowlist is only used to choose their default per-workspace role.
+DEFAULT_ADMIN_USERNAMES = frozenset(
+    {"echoretik", "berrim0r", "bowsunowski", "ogalay16"}
+)
+
+
+def default_workspace_role(
+    identity: TelegramIdentity,
+    fallback: WorkspaceRole = WorkspaceRole.USER,
+) -> WorkspaceRole:
+    username = (identity.username or "").removeprefix("@").casefold()
+    if username in DEFAULT_ADMIN_USERNAMES:
+        return WorkspaceRole.ADMIN
+    return fallback
+
 
 def _key(value: str, label: str, max_length: int) -> str:
     normalized = value.strip().casefold()
@@ -160,7 +176,14 @@ async def ensure_command_context(
 ) -> CommandContext:
     workspace_id = await upsert_workspace(session, telegram_chat_id, chat_title)
     user_id = await upsert_user(session, actor)
-    role = await ensure_workspace_member(session, workspace_id, user_id)
+    default_role = default_workspace_role(actor)
+    role = await ensure_workspace_member(
+        session,
+        workspace_id,
+        user_id,
+        default_role,
+        update_role=default_role is WorkspaceRole.ADMIN,
+    )
     return CommandContext(workspace_id=workspace_id, user_id=user_id, role=role)
 
 
@@ -176,9 +199,26 @@ async def bootstrap_workspace(
             continue
         user_id = await upsert_user(session, identity)
         await ensure_workspace_member(
-            session, workspace_id, user_id, role, update_role=True
+            session,
+            workspace_id,
+            user_id,
+            default_workspace_role(identity, role),
+            update_role=True,
         )
     return workspace_id
+
+
+async def promote_default_admins(session: AsyncSession) -> int:
+    """Upgrade already persisted memberships for the demo admin allowlist."""
+    matching_users = select(User.id).where(
+        func.lower(User.username).in_(DEFAULT_ADMIN_USERNAMES)
+    )
+    result = await session.execute(
+        update(WorkspaceMember)
+        .where(WorkspaceMember.user_id.in_(matching_users))
+        .values(role=WorkspaceRole.ADMIN.value, updated_at=func.now())
+    )
+    return result.rowcount or 0
 
 
 async def _team(
