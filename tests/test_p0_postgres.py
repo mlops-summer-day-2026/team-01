@@ -86,6 +86,23 @@ async def test_p0_flow_isolation_atomic_take_and_restart() -> None:
             await services.create_stand(
                 session, moderator_context, "backend", "dev-2"
             )
+            free_stands = await services.list_free_stands(
+                session, user_a_context, "BACKEND"
+            )
+            assert "Dev-1" in free_stands
+            assert "dev-2" in free_stands
+
+            role_change = await services.set_workspace_role(
+                session, owner_context, user_a, "MODERATOR"
+            )
+            assert "USER → MODERATOR" in role_change
+            await services.set_workspace_role(
+                session, owner_context, user_a, "USER"
+            )
+            with pytest.raises(services.DomainError, match="последнего ADMIN"):
+                await services.set_workspace_role(
+                    session, owner_context, owner, "USER"
+                )
             with pytest.raises(services.DomainError, match="уже существует"):
                 await services.create_stand(
                     session, moderator_context, "backend", "DEV-1"
@@ -130,6 +147,10 @@ async def test_p0_flow_isolation_atomic_take_and_restart() -> None:
         loser_context = user_b_context if winner_context is user_a_context else user_a_context
 
         async with database.sessions() as session:
+            my_stands = await services.list_my_stands(session, winner_context)
+            assert "Dev-1" in my_stands
+            assert "Backend Team" in my_stands
+
             idempotent = await services.take_stand(
                 session, winner_context, "backend", "dev-1"
             )

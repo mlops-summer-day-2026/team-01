@@ -19,6 +19,8 @@ HELP_TEXT = """Управление общими стендами
 /users — известные боту пользователи
 /team_users <team>
 /stands <team>
+/free_stands [team] — свободные стенды
+/my_stands — занятые вами стенды
 /take_stand <team> <stand>
 /untake_stand <team> <stand>
 
@@ -30,7 +32,8 @@ HELP_TEXT = """Управление общими стендами
 
 Администратор:
 /create_team <slug> [название]
-/delete_team <team>"""
+/delete_team <team>
+/set_role <USER|MODERATOR|ADMIN> — Reply на сообщение пользователя"""
 
 
 class DatabaseSessionMiddleware(BaseMiddleware):
@@ -188,6 +191,54 @@ def create_router(sessions: async_sessionmaker[AsyncSession]) -> Router:
         context = await _context(message, session)
         if context:
             await _answer(message, services.list_users(session, context))
+
+    @router.message(Command("set_role"))
+    async def set_role(
+        message: Message, command: CommandObject, session: AsyncSession
+    ) -> None:
+        context = await _context(message, session)
+        if context is None:
+            return
+        target = _reply_target(message)
+        try:
+            role_name = _one_arg(
+                command,
+                "/set_role <USER|MODERATOR|ADMIN> (Reply на сообщение пользователя)",
+            )
+            if target is None:
+                raise services.DomainError(
+                    "Команда /set_role должна быть Reply на сообщение пользователя."
+                )
+        except services.DomainError as error:
+            await message.answer(f"⚠️ {error}")
+            return
+        await _answer(
+            message,
+            services.set_workspace_role(session, context, target, role_name),
+        )
+
+    @router.message(Command("my_stands"))
+    async def my_stands(message: Message, session: AsyncSession) -> None:
+        context = await _context(message, session)
+        if context:
+            await _answer(message, services.list_my_stands(session, context))
+
+    @router.message(Command("free_stands"))
+    async def free_stands(
+        message: Message, command: CommandObject, session: AsyncSession
+    ) -> None:
+        context = await _context(message, session)
+        if context is None:
+            return
+        try:
+            parts = _args(command).split()
+            if len(parts) > 1:
+                raise services.DomainError("Использование: /free_stands [team]")
+            slug = parts[0] if parts else None
+        except services.DomainError as error:
+            await message.answer(f"⚠️ {error}")
+            return
+        await _answer(message, services.list_free_stands(session, context, slug))
 
     @router.message(Command("create_team"))
     async def create_team(

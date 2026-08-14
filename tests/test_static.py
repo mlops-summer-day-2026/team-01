@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from sqlalchemy.dialects import postgresql
 
 from app.config import Settings
 from app.db import Database
 from app.handlers import create_router
 from app.models import Base
-from app.services import _atomic_take_statement
+from app.main import COMMANDS
+from app.models import WorkspaceRole
+from app.services import DomainError, _atomic_take_statement, parse_workspace_role
 
 
 def test_settings_and_router_construct_without_external_connections(monkeypatch) -> None:
@@ -20,9 +23,34 @@ def test_settings_and_router_construct_without_external_connections(monkeypatch)
 
     database = Database(settings.database_url)
     router = create_router(database.sessions)
-    assert len(router.message.handlers) == 14
+    assert len(router.message.handlers) == 17
     assert len(router.my_chat_member.handlers) == 1
     asyncio.run(database.close())
+
+
+def test_p1_p2_commands_are_registered() -> None:
+    command_names = {item.command for item in COMMANDS}
+    assert {"set_role", "my_stands", "free_stands"} <= command_names
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("USER", WorkspaceRole.USER),
+        ("пользователь", WorkspaceRole.USER),
+        ("mod", WorkspaceRole.MODERATOR),
+        ("МОДЕРАТОР", WorkspaceRole.MODERATOR),
+        ("admin", WorkspaceRole.ADMIN),
+        ("Администратор", WorkspaceRole.ADMIN),
+    ],
+)
+def test_workspace_role_parser(value: str, expected: WorkspaceRole) -> None:
+    assert parse_workspace_role(value) is expected
+
+
+def test_workspace_role_parser_rejects_unknown_role() -> None:
+    with pytest.raises(DomainError, match="USER, MODERATOR или ADMIN"):
+        parse_workspace_role("superadmin")
 
 
 def test_schema_contains_only_the_six_p0_tables() -> None:

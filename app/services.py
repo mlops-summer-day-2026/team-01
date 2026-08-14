@@ -42,6 +42,17 @@ ROLE_RANK = {
     WorkspaceRole.ADMIN: 2,
 }
 
+ROLE_ALIASES = {
+    "user": WorkspaceRole.USER,
+    "пользователь": WorkspaceRole.USER,
+    "moderator": WorkspaceRole.MODERATOR,
+    "mod": WorkspaceRole.MODERATOR,
+    "модератор": WorkspaceRole.MODERATOR,
+    "admin": WorkspaceRole.ADMIN,
+    "administrator": WorkspaceRole.ADMIN,
+    "администратор": WorkspaceRole.ADMIN,
+}
+
 
 def _key(value: str, label: str, max_length: int) -> str:
     normalized = value.strip().casefold()
@@ -58,6 +69,13 @@ def _display_name(identity: TelegramIdentity) -> str:
 
 def _person(display_name: str, username: str | None) -> str:
     return f"{display_name} (@{username})" if username else display_name
+
+
+def parse_workspace_role(value: str) -> WorkspaceRole:
+    role = ROLE_ALIASES.get(value.strip().casefold())
+    if role is None:
+        raise DomainError("Неизвестная роль. Используйте USER, MODERATOR или ADMIN.")
+    return role
 
 
 def _require_role(context: CommandContext, minimum: WorkspaceRole) -> None:
@@ -239,6 +257,115 @@ async def list_users(session: AsyncSession, context: CommandContext) -> str:
     lines.extend(
         f"• {_person(display_name, username)} — {role}"
         for display_name, username, role in users
+    )
+    return "\n".join(lines)
+
+
+async def set_workspace_role(
+    session: AsyncSession,
+    context: CommandContext,
+    target: TelegramIdentity,
+    role_name: str,
+) -> str:
+    _require_role(context, WorkspaceRole.ADMIN)
+    if target.is_bot:
+        raise DomainError("Нельзя назначить workspace-роль боту.")
+    new_role = parse_workspace_role(role_name)
+    target_user_id = await upsert_user(session, target)
+    current_role = await ensure_workspace_member(
+        session, context.workspace_id, target_user_id
+    )
+    if current_role == new_role:
+        return (
+            f"ℹ️ {_person(_display_name(target), target.username)} уже имеет роль "
+            f"{new_role.value}."
+        )
+
+    if current_role == WorkspaceRole.ADMIN and new_role != WorkspaceRole.ADMIN:
+        admin_count = await session.scalar(
+            select(func.count())
+            .select_from(WorkspaceMember)
+            .where(
+                WorkspaceMember.workspace_id == context.workspace_id,
+                WorkspaceMember.role == WorkspaceRole.ADMIN.value,
+            )
+        )
+        if not admin_count or admin_count <= 1:
+            raise DomainError("Нельзя понизить последнего ADMIN этого Workspace.")
+
+    await session.execute(
+        update(WorkspaceMember)
+        .where(
+            WorkspaceMember.workspace_id == context.workspace_id,
+            WorkspaceMember.user_id == target_user_id,
+        )
+        .values(role=new_role.value, updated_at=func.now())
+    )
+    return (
+        f"✅ {_person(_display_name(target), target.username)}: роль "
+        f"{current_role.value} → {new_role.value}."
+    )
+
+
+async def list_my_stands(
+    session: AsyncSession, context: CommandContext
+) -> str:
+    stands = (
+        await session.execute(
+            select(Team.slug, Team.name, Stand.name, Stand.occupied_at)
+            .join(Stand, Stand.team_id == Team.id)
+            .where(
+                Team.workspace_id == context.workspace_id,
+                Stand.occupied_by_user_id == context.user_id,
+            )
+            .order_by(Team.slug, Stand.name_key)
+        )
+    ).all()
+    if not stands:
+        return "У вас нет занятых стендов в этом Workspace."
+    lines = ["Ваши занятые стенды:"]
+    for slug, team_name, stand_name, occupied_at in stands:
+        occupied_time = occupied_at.astimezone().strftime("%H:%M")
+        lines.append(f"• {team_name} [{slug}]: {stand_name}, с {occupied_time}")
+    return "\n".join(lines)
+
+
+async def list_free_stands(
+    session: AsyncSession,
+    context: CommandContext,
+    slug: str | None = None,
+) -> str:
+    statement = (
+        select(Team.slug, Team.name, Stand.name)
+        .join(Stand, Stand.team_id == Team.id)
+        .where(
+            Team.workspace_id == context.workspace_id,
+            Stand.occupied_by_user_id.is_(None),
+        )
+        .order_by(Team.slug, Stand.name_key)
+    )
+    if slug is not None:
+        team = await _team(session, context.workspace_id, slug)
+        if context.role == WorkspaceRole.USER and not await _is_team_member(
+            session, team.id, context.user_id
+        ):
+            raise DomainError("Вы не состоите в этой Team.")
+        statement = statement.where(Team.id == team.id)
+    elif context.role == WorkspaceRole.USER:
+        statement = statement.join(
+            TeamMember,
+            (TeamMember.team_id == Team.id)
+            & (TeamMember.user_id == context.user_id),
+        )
+
+    stands = (await session.execute(statement)).all()
+    if not stands:
+        suffix = f" в Team [{slug.casefold()}]" if slug else " в доступных вам Team"
+        return f"Свободных стендов{suffix} нет."
+    lines = ["Свободные стенды:"]
+    lines.extend(
+        f"• {team_name} [{team_slug}]: {stand_name}"
+        for team_slug, team_name, stand_name in stands
     )
     return "\n".join(lines)
 
