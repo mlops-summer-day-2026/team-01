@@ -1,19 +1,49 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
+
     environment:
-      POSTGRES_DB: standbot
-      POSTGRES_USER: standbot
-      POSTGRES_PASSWORD: standbot
+      POSTGRES_DB: ${POSTGRES_DB:-stand_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-stand_manager}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stand_manager_local}
+
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
     volumes:
-      - standbot_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U standbot -d standbot"]
-      interval: 2s
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-stand_manager} -d ${POSTGRES_DB:-stand_manager}"
+        ]
+      interval: 3s
       timeout: 3s
-      retries: 15
+      retries: 20
+      start_period: 3s
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+    init: true
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stand_manager}:${POSTGRES_PASSWORD:-stand_manager_local}@postgres:5432/${POSTGRES_DB:-stand_manager}
+      PYTHONUNBUFFERED: "1"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  standbot_postgres_data:
+  postgres_data:
+  
